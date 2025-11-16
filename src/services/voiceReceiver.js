@@ -45,7 +45,7 @@ class VoiceReceiver extends EventEmitter {
         const audioStream = this.receiver.subscribe(userId, {
             end: {
                 behavior: EndBehaviorType.AfterSilence,
-                duration: 300, // 300ms of silence before ending (faster response)
+                duration: 500, // 500ms of silence before ending (faster response)
             },
         });
 
@@ -105,7 +105,7 @@ class VoiceReceiver extends EventEmitter {
         const timer = setTimeout(() => {
             this.processUserAudio(userId);
             this.silenceTimers.delete(userId);
-        }, 1000); // Wait 1 second after speaking stops
+        }, 250); // Wait 0.25 seconds after speaking stops
 
         this.silenceTimers.set(userId, timer);
     }
@@ -134,15 +134,25 @@ class VoiceReceiver extends EventEmitter {
         const totalLength = buffer.reduce((sum, chunk) => sum + chunk.length, 0);
         const audioData = Buffer.concat(buffer, totalLength);
 
-        // Check if we have enough audio (at least 0.5 seconds of PCM)
+        // Check if we have enough audio (at least 0.5 seconds of PCM to filter out keyboard noises)
         const minSamples = 48000 * 2 * 2 * 0.5; // 48kHz * 2 channels * 2 bytes * 0.5 seconds
         if (audioData.length < minSamples) {
-            console.log(`Audio too short for user ${userId}, ignoring`);
+            console.log(`Audio too short for user ${userId} (${audioData.length} bytes), ignoring`);
             this.cleanup(userId);
             return;
         }
 
-        console.log(`📦 Captured ${audioData.length} bytes of PCM audio from user ${userId}`);
+        // Calculate average volume to filter out quiet background noises
+        const avgVolume = this.calculateAverageVolume(audioData);
+        const minVolume = 400; // Minimum volume threshold (adjust as needed)
+
+        if (avgVolume < minVolume) {
+            console.log(`Audio too quiet for user ${userId} (avg volume: ${avgVolume}), ignoring`);
+            this.cleanup(userId);
+            return;
+        }
+
+        console.log(`📦 Captured ${audioData.length} bytes of PCM audio from user ${userId} (avg volume: ${avgVolume})`);
 
         // Emit the PCM audio data for processing
         this.emit('audioReceived', {
@@ -156,6 +166,19 @@ class VoiceReceiver extends EventEmitter {
 
         // Cleanup this user's data
         this.cleanup(userId);
+    }
+
+    /**
+     * Calculate average volume/amplitude of audio data
+     */
+    calculateAverageVolume(audioData) {
+        let sum = 0;
+        // Read 16-bit PCM samples
+        for (let i = 0; i < audioData.length - 1; i += 2) {
+            const sample = audioData.readInt16LE(i);
+            sum += Math.abs(sample);
+        }
+        return sum / (audioData.length / 2);
     }
 
     cleanup(userId) {

@@ -5,6 +5,7 @@ import TTSService from './ttsService.js';
 import AudioPlayer from './audioPlayer.js';
 import { getCharacter } from '../characters.js';
 import { getRandomTick, shouldUseTick } from '../vocalTicks.js';
+import { getRandomTrivia } from '../triviaQuestions.js';
 
 class ConversationManager {
     constructor(voiceReceiver, audioPlayer, characterName = 'connor', guild = null) {
@@ -19,6 +20,11 @@ class ConversationManager {
         this.isProcessing = new Set(); // Track which users are being processed
         this.isActive = false;
 
+        // Silence and trivia tracking
+        this.lastActivityTime = Date.now();
+        this.silenceTimer = null;
+        this.triviaAskedInCurrentSilence = false;
+
         // Set initial character
         this.setCharacter(getCharacter(characterName));
     }
@@ -32,19 +38,17 @@ class ConversationManager {
         this.ttsService.setVoice(character.voiceId);
         console.log(`🎭 Character set to: ${character.name}`);
 
-        // Update bot's nickname in the server
+        // Update bot's nickname in the server to Discord name
         if (this.guild) {
             try {
                 const me = await this.guild.members.fetchMe();
-                await me.setNickname(character.name);
-                console.log(`✏️  Changed bot nickname to: ${character.name}`);
+                await me.setNickname(character.discordName);
+                console.log(`✏️  Changed bot nickname to: ${character.discordName}`);
             } catch (error) {
                 console.error('Failed to change nickname:', error.message);
             }
         }
-    }
-
-    /**
+    }    /**
      * Start listening and responding to voice
      */
     async start() {
@@ -58,11 +62,56 @@ class ConversationManager {
 
         this.voiceReceiver.start();
 
+        // Start silence detection for trivia questions
+        this.startSilenceDetection();
+
         // Start cleanup interval (every 30 minutes)
         this.cleanupInterval = setInterval(() => {
             this.asrService.cleanupTempFiles();
             this.ttsService.cleanupTempFiles();
         }, 1800000);
+    }
+
+    /**
+     * Start detecting silence periods for trivia questions
+     */
+    startSilenceDetection() {
+        // Check for silence every 3 seconds
+        this.silenceTimer = setInterval(() => {
+            const silenceDuration = Date.now() - this.lastActivityTime;
+
+            // If it's been 6+ seconds since last activity and we haven't asked trivia yet this silence
+            if (silenceDuration > 6000 && !this.triviaAskedInCurrentSilence) {
+                // 10% chance to ask trivia during silence
+                if (Math.random() < 0.1) {
+                    this.askRandomTrivia();
+                    this.triviaAskedInCurrentSilence = true;
+                }
+            }
+        }, 3000); // Check every 3 seconds
+    }
+
+    /**
+     * Ask a random trivia question
+     */
+    async askRandomTrivia() {
+        try {
+            const trivia = getRandomTrivia();
+            console.log(`🤔 Asking trivia during silence: "${trivia}"`);
+
+            const ttsFilePath = await this.ttsService.textToSpeech(trivia);
+            await this.audioPlayer.enqueue(ttsFilePath, true);
+        } catch (error) {
+            console.error('Error asking trivia:', error);
+        }
+    }
+
+    /**
+     * Reset activity tracking (called when user speaks)
+     */
+    resetActivity() {
+        this.lastActivityTime = Date.now();
+        this.triviaAskedInCurrentSilence = false;
     }
 
     /**
@@ -90,6 +139,11 @@ class ConversationManager {
                 console.log('Transcription too short or empty, ignoring...');
                 return;
             }
+
+            // ONLY reset activity timer after successful transcription
+            // This prevents keyboard typing from triggering trivia questions
+            this.resetActivity();
+            console.log('✅ Valid conversation detected - silence timer reset');
 
             // Check if user is addressing a specific character with "Hey [name]"
             const characterSwitch = this.detectCharacterSwitch(transcribedText);
@@ -201,6 +255,11 @@ class ConversationManager {
         // Clear cleanup interval
         if (this.cleanupInterval) {
             clearInterval(this.cleanupInterval);
+        }
+
+        // Clear silence timer
+        if (this.silenceTimer) {
+            clearInterval(this.silenceTimer);
         }
 
         // Stop components
