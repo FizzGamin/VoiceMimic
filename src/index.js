@@ -96,9 +96,9 @@ class VoiceMimicBot {
             const voiceReceiver = new VoiceReceiver(connection);
             const audioPlayer = new AudioPlayer(connection);
             const conversationManager = new ConversationManager(
-                voiceReceiver, 
-                audioPlayer, 
-                'connor', 
+                voiceReceiver,
+                audioPlayer,
+                'connor',
                 message.guild,
                 this.client // Pass bot client for avatar changes
             );
