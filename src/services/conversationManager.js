@@ -8,10 +8,11 @@ import { getRandomTick, shouldUseTick } from '../vocalTicks.js';
 import { getRandomTrivia } from '../triviaQuestions.js';
 
 class ConversationManager {
-    constructor(voiceReceiver, audioPlayer, characterName = 'connor', guild = null) {
+    constructor(voiceReceiver, audioPlayer, characterName = 'connor', guild = null, botClient = null) {
         this.voiceReceiver = voiceReceiver;
         this.audioPlayer = audioPlayer;
         this.guild = guild; // Store guild reference for nickname changes
+        this.botClient = botClient; // Store bot client reference for avatar changes
 
         this.asrService = new ASRService();
         this.llmService = new LLMService();
@@ -46,6 +47,16 @@ class ConversationManager {
                 console.log(`✏️  Changed bot nickname to: ${character.discordName}`);
             } catch (error) {
                 console.error('Failed to change nickname:', error.message);
+            }
+        }
+
+        // Update bot's avatar if avatarUrl is provided
+        if (this.botClient && character.avatarUrl) {
+            try {
+                await this.botClient.user.setAvatar(character.avatarUrl);
+                console.log(`🖼️  Changed bot avatar for: ${character.name}`);
+            } catch (error) {
+                console.error('Failed to change avatar:', error.message);
             }
         }
     }    /**
