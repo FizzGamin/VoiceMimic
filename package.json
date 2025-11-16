@@ -1,0 +1,42 @@
+{
+    "name": "voicemimic-discord-bot",
+    "version": "1.0.0",
+    "description": "Discord bot that captures voice, processes through AI, and responds with ElevenLabs TTS",
+    "main": "src/index.js",
+    "type": "module",
+    "scripts": {
+        "start": "node src/index.js",
+        "dev": "node --watch src/index.js",
+        "setup": "node scripts/setup.js",
+        "list-voices": "node scripts/listVoices.js"
+    },
+    "keywords": [
+        "discord",
+        "bot",
+        "voice",
+        "ai",
+        "tts",
+        "elevenlabs"
+    ],
+    "author": "",
+    "license": "MIT",
+    "dependencies": {
+        "@discordjs/voice": "^0.17.0",
+        "discord.js": "^14.14.1",
+        "dotenv": "^16.3.1",
+        "elevenlabs-node": "^1.1.1",
+        "ffmpeg-static": "^5.2.0",
+        "libsodium-wrappers": "^0.7.13",
+        "node-fetch": "^3.3.2",
+        "openai": "^4.20.1",
+        "opusscript": "^0.0.8",
+        "prism-media": "^1.3.5",
+        "wav": "^1.0.2"
+    },
+    "devDependencies": {
+        "@types/node": "^20.10.0"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
+}
