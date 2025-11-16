@@ -16,6 +16,7 @@ export default {
         apiKey: process.env.OPENAI_API_KEY,
         model: process.env.AI_MODEL || 'gpt-4-turbo-preview',
         systemPrompt: process.env.AI_SYSTEM_PROMPT || 'You are a helpful AI assistant in a Discord voice channel. Keep responses concise and conversational.',
+        maxTokens: parseInt(process.env.AI_MAX_TOKENS) || 150,
     },
 
     // ElevenLabs

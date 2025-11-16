@@ -4,6 +4,7 @@ import config from './config.js';
 import VoiceReceiver from './services/voiceReceiver.js';
 import AudioPlayer from './services/audioPlayer.js';
 import ConversationManager from './services/conversationManager.js';
+import { getCharacter, listCharacters } from './characters.js';
 
 class VoiceMimicBot {
     constructor() {
@@ -42,6 +43,10 @@ class VoiceMimicBot {
                         break;
                     case 'leave':
                         await this.handleLeaveCommand(message);
+                        break;
+                    case 'character':
+                    case 'char':
+                        await this.handleCharacterCommand(message, args);
                         break;
                     case 'help':
                         await this.handleHelpCommand(message);
@@ -90,7 +95,7 @@ class VoiceMimicBot {
             // Initialize components
             const voiceReceiver = new VoiceReceiver(connection);
             const audioPlayer = new AudioPlayer(connection);
-            const conversationManager = new ConversationManager(voiceReceiver, audioPlayer);
+            const conversationManager = new ConversationManager(voiceReceiver, audioPlayer, 'connor', message.guild);
 
             this.voiceConnections.set(message.guild.id, {
                 connection,
@@ -154,6 +159,8 @@ class VoiceMimicBot {
 
 \`${config.discord.prefix}join\` - Join your current voice channel
 \`${config.discord.prefix}leave\` - Leave the voice channel
+\`${config.discord.prefix}character <name>\` - Switch bot personality (connor, elijah, or griffin)
+\`${config.discord.prefix}character list\` - List all available characters
 \`${config.discord.prefix}help\` - Show this help message
 
 **How it works:**
@@ -169,6 +176,35 @@ class VoiceMimicBot {
     `;
 
         await message.reply(helpText);
+    }
+
+    async handleCharacterCommand(message, args) {
+        const manager = this.conversationManagers.get(message.guild.id);
+
+        if (!manager) {
+            await message.reply('❌ I need to be in a voice channel first! Use `!join`');
+            return;
+        }
+
+        if (args.length === 0 || args[0] === 'list') {
+            const chars = listCharacters();
+            const charList = chars.map(c => `• **${c.name}** (ID: \`${c.id}\`)`).join('\n');
+            await message.reply(`**Available Characters:**\n${charList}\n\nUse \`!character <name>\` to switch.`);
+            return;
+        }
+
+        const characterName = args[0].toLowerCase();
+        const character = getCharacter(characterName);
+
+        if (!character) {
+            await message.reply(`❌ Character "${characterName}" not found. Use \`!character list\` to see all characters.`);
+            return;
+        }
+
+        // Update the manager with new character
+        await manager.setCharacter(character);
+
+        await message.reply(`✅ Switched to **${character.name}**! 🎭`);
     }
 
     cleanup(guildId) {

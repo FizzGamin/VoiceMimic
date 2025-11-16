@@ -21,6 +21,14 @@ class TTSService {
     }
 
     /**
+     * Set voice ID for TTS
+     */
+    setVoice(voiceId) {
+        this.voiceId = voiceId;
+        console.log(`🎤 TTS voice set to: ${voiceId}`);
+    }
+
+    /**
      * Convert text to speech using ElevenLabs
      */
     async textToSpeech(text) {

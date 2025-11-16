@@ -45,7 +45,7 @@ class VoiceReceiver extends EventEmitter {
         const audioStream = this.receiver.subscribe(userId, {
             end: {
                 behavior: EndBehaviorType.AfterSilence,
-                duration: 500, // 500ms of silence before ending
+                duration: 300, // 300ms of silence before ending (faster response)
             },
         });
 

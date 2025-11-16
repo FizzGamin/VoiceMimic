@@ -3,11 +3,14 @@ import ASRService from './asrService.js';
 import LLMService from './llmService.js';
 import TTSService from './ttsService.js';
 import AudioPlayer from './audioPlayer.js';
+import { getCharacter } from '../characters.js';
+import { getRandomTick, shouldUseTick } from '../vocalTicks.js';
 
 class ConversationManager {
-    constructor(voiceReceiver, audioPlayer) {
+    constructor(voiceReceiver, audioPlayer, characterName = 'connor', guild = null) {
         this.voiceReceiver = voiceReceiver;
         this.audioPlayer = audioPlayer;
+        this.guild = guild; // Store guild reference for nickname changes
 
         this.asrService = new ASRService();
         this.llmService = new LLMService();
@@ -15,6 +18,30 @@ class ConversationManager {
 
         this.isProcessing = new Set(); // Track which users are being processed
         this.isActive = false;
+
+        // Set initial character
+        this.setCharacter(getCharacter(characterName));
+    }
+
+    /**
+     * Switch to a different character/personality
+     */
+    async setCharacter(character) {
+        this.currentCharacter = character;
+        this.llmService.setCharacter(character);
+        this.ttsService.setVoice(character.voiceId);
+        console.log(`🎭 Character set to: ${character.name}`);
+
+        // Update bot's nickname in the server
+        if (this.guild) {
+            try {
+                const me = await this.guild.members.fetchMe();
+                await me.setNickname(character.name);
+                console.log(`✏️  Changed bot nickname to: ${character.name}`);
+            } catch (error) {
+                console.error('Failed to change nickname:', error.message);
+            }
+        }
     }
 
     /**
@@ -64,8 +91,37 @@ class ConversationManager {
                 return;
             }
 
-            // Step 2: Generate AI response (LLM)
-            const aiResponse = await this.llmService.generateResponse(userId, transcribedText);
+            // Check if user is addressing a specific character with "Hey [name]"
+            const characterSwitch = this.detectCharacterSwitch(transcribedText);
+            if (characterSwitch) {
+                const character = getCharacter(characterSwitch.characterName);
+                await this.setCharacter(character);
+                console.log(`🎯 Detected character switch to: ${character.name}`);
+
+                // Use the remaining text (without "Hey [name]") for the response
+                const remainingText = characterSwitch.remainingText;
+
+                // If there's nothing left after "Hey [name]", just acknowledge with a tick
+                if (!remainingText || remainingText.length < 3) {
+                    const aiResponse = getRandomTick();
+                    console.log(`🎲 Acknowledging with tick: "${aiResponse}"`);
+                    const ttsFilePath = await this.ttsService.textToSpeech(aiResponse);
+                    await this.audioPlayer.enqueue(ttsFilePath, true);
+                    console.log(`✅ Character switched and acknowledged\n`);
+                    return;
+                }
+            }
+
+            // Step 2: Decide if we should use a vocal tick or full AI response
+            let aiResponse;
+
+            if (shouldUseTick(0.3)) { // 30% chance of using a vocal tick
+                aiResponse = getRandomTick();
+                console.log(`🎲 Using vocal tick: "${aiResponse}"`);
+            } else {
+                // Generate full AI response (LLM)
+                aiResponse = await this.llmService.generateResponse(userId, transcribedText);
+            }
 
             // Check if AI response is empty
             if (!aiResponse || aiResponse.length === 0) {
@@ -95,6 +151,29 @@ class ConversationManager {
             // Remove user from processing set
             this.isProcessing.delete(userId);
         }
+    }
+
+    /**
+     * Detect if user is addressing a specific character with "Hey [name]"
+     * Returns { characterName, remainingText } or null
+     */
+    detectCharacterSwitch(text) {
+        const lowerText = text.toLowerCase();
+        const patterns = [
+            { regex: /^hey\s+(connor|griffin|elijah)\b[,.]?\s*/i, group: 1 },
+            { regex: /^(connor|griffin|elijah)\b[,.]?\s*/i, group: 1 },
+        ];
+
+        for (const pattern of patterns) {
+            const match = lowerText.match(pattern.regex);
+            if (match) {
+                const characterName = match[pattern.group].toLowerCase();
+                const remainingText = text.substring(match[0].length).trim();
+                return { characterName, remainingText };
+            }
+        }
+
+        return null;
     }
 
     /**

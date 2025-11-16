@@ -9,6 +9,28 @@ class LLMService {
 
         this.conversationHistory = new Map();
         this.maxHistoryLength = 10; // Keep last 10 messages per user
+
+        // Default character settings
+        this.currentCharacter = {
+            systemPrompt: config.openai.systemPrompt,
+            maxTokens: config.openai.maxTokens,
+            temperature: 0.8,
+        };
+    }
+
+    /**
+     * Update character settings
+     */
+    setCharacter(character) {
+        this.currentCharacter = {
+            systemPrompt: character.systemPrompt,
+            maxTokens: character.maxTokens,
+            temperature: character.temperature,
+        };
+
+        // Clear all conversation histories to apply new system prompt
+        this.conversationHistory.clear();
+        console.log(`🎭 LLM character updated: ${character.name}`);
     }
 
     /**
@@ -19,7 +41,7 @@ class LLMService {
             this.conversationHistory.set(userId, [
                 {
                     role: 'system',
-                    content: config.openai.systemPrompt,
+                    content: this.currentCharacter.systemPrompt,
                 },
             ]);
         }
@@ -66,10 +88,11 @@ class LLMService {
             const completion = await this.openai.chat.completions.create({
                 model: config.openai.model,
                 messages: messages,
-                temperature: 0.7,
-                max_tokens: 150, // Keep responses concise for voice
+                temperature: this.currentCharacter.temperature,
+                max_tokens: this.currentCharacter.maxTokens,
                 presence_penalty: 0.6,
                 frequency_penalty: 0.3,
+                stream: false, // Could enable streaming in future for even faster responses
             });
 
             const aiResponse = completion.choices[0].message.content.trim();

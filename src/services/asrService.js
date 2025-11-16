@@ -4,6 +4,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import ffmpegPath from 'ffmpeg-static';
+import fetch from 'node-fetch';
+import FormData from 'form-data';
 import config from '../config.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -13,6 +15,8 @@ class ASRService {
     constructor() {
         this.openai = new OpenAI({
             apiKey: config.openai.apiKey,
+            timeout: 60000, // 60 second timeout
+            maxRetries: 2,
         });
 
         // Create temp directory if it doesn't exist
@@ -140,7 +144,7 @@ class ASRService {
             // Check if audioData is an object with format info (from voice receiver)
             if (audioData && typeof audioData === 'object' && !Buffer.isBuffer(audioData) && audioData.audioData) {
                 console.log(`🎵 Processing ${audioData.format || 'PCM'} audio...`);
-                
+
                 let processedData = audioData.audioData;
                 let processedChannels = audioData.channels;
 
@@ -170,13 +174,64 @@ class ASRService {
 
             console.log(`🎵 Transcribing audio file: ${tempFilePath} (${wavData.length} bytes)`);
 
-            // Call OpenAI Whisper API
-            const transcription = await this.openai.audio.transcriptions.create({
-                file: fs.createReadStream(tempFilePath),
-                model: 'whisper-1',
-                language: 'en', // Set to 'en' for English, or remove for auto-detection
-                response_format: 'json',
-            });
+            // Use raw fetch instead of OpenAI SDK for better network compatibility
+            let transcription;
+            let lastError;
+            const maxRetries = 3;
+
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    // Create FormData for multipart upload
+                    const formData = new FormData();
+                    formData.append('file', fs.createReadStream(tempFilePath), {
+                        filename: 'audio.wav',
+                        contentType: 'audio/wav',
+                    });
+                    formData.append('model', 'whisper-1');
+                    formData.append('language', 'en');
+                    formData.append('response_format', 'json');
+
+                    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${config.openai.apiKey}`,
+                            ...formData.getHeaders(),
+                        },
+                        body: formData,
+                        timeout: 60000, // 60 second timeout
+                    });
+
+                    if (!response.ok) {
+                        const error = new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+                        error.status = response.status;
+                        throw error;
+                    }
+
+                    transcription = await response.json();
+                    break; // Success, exit retry loop
+                } catch (error) {
+                    lastError = error;
+                    const shouldRetry = (
+                        error.code === 'ECONNRESET' ||
+                        error.type === 'request-timeout' ||
+                        error.status === 429 ||
+                        error.status >= 500 ||
+                        error.message?.includes('429')
+                    );
+
+                    if (attempt < maxRetries && shouldRetry) {
+                        const waitTime = error.status === 429 ? 5000 * attempt : 2000 * attempt;
+                        console.log(`⚠️  Attempt ${attempt} failed (${error.message}), retrying in ${waitTime / 1000}s...`);
+                        await new Promise(resolve => setTimeout(resolve, waitTime));
+                    } else {
+                        throw error; // Give up
+                    }
+                }
+            }
+
+            if (!transcription) {
+                throw lastError;
+            }
 
             // Clean up temp file
             fs.unlinkSync(tempFilePath);
