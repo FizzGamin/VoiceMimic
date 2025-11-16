@@ -9,6 +9,7 @@ export default {
         clientId: process.env.DISCORD_CLIENT_ID,
         prefix: process.env.BOT_PREFIX || '!',
         voiceChannelId: process.env.VOICE_CHANNEL_ID || null,
+        defaultCharacter: process.env.DEFAULT_CHARACTER || 'connor',
     },
 
     // OpenAI

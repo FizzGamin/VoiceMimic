@@ -3,6 +3,7 @@ import ASRService from './asrService.js';
 import LLMService from './llmService.js';
 import TTSService from './ttsService.js';
 import AudioPlayer from './audioPlayer.js';
+import ResponseLock from './responseLock.js';
 import { getCharacter } from '../characters.js';
 import { getRandomTick, shouldUseTick } from '../vocalTicks.js';
 import { getRandomTrivia } from '../triviaQuestions.js';
@@ -17,9 +18,14 @@ class ConversationManager {
         this.asrService = new ASRService();
         this.llmService = new LLMService();
         this.ttsService = new TTSService();
+        this.responseLock = new ResponseLock();
 
         this.isProcessing = new Set(); // Track which users are being processed
         this.isActive = false;
+
+        // Generate unique bot ID for this instance
+        this.botId = `bot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        console.log(`🤖 Bot ID: ${this.botId}`);
 
         // Silence and trivia tracking
         this.lastActivityTime = Date.now();
@@ -80,6 +86,7 @@ class ConversationManager {
         this.cleanupInterval = setInterval(() => {
             this.asrService.cleanupTempFiles();
             this.ttsService.cleanupTempFiles();
+            this.responseLock.cleanStale();
         }, 1800000);
     }
 
@@ -107,17 +114,20 @@ class ConversationManager {
      */
     async askRandomTrivia() {
         try {
+            // Don't interrupt if bot is already speaking
+            if (this.audioPlayer.isPlaying) {
+                return;
+            }
+
             const trivia = getRandomTrivia();
             console.log(`🤔 Asking trivia during silence: "${trivia}"`);
 
             const ttsFilePath = await this.ttsService.textToSpeech(trivia);
-            await this.audioPlayer.enqueue(ttsFilePath, true);
+            await this.audioPlayer.play(ttsFilePath, true);
         } catch (error) {
             console.error('Error asking trivia:', error);
         }
-    }
-
-    /**
+    }    /**
      * Reset activity tracking (called when user speaks)
      */
     resetActivity() {
@@ -131,9 +141,23 @@ class ConversationManager {
     async handleAudioReceived(audioData) {
         const { userId } = audioData;
 
+        // Try to acquire lock (random bot wins if both try at once)
+        if (!this.responseLock.tryAcquire(userId, this.botId)) {
+            console.log(`🔒 Another bot is handling user ${userId}, skipping...`);
+            return;
+        }
+
+        // Skip if bot is already speaking (no queue system)
+        if (this.audioPlayer.isPlaying) {
+            console.log(`⚠️  Bot is speaking, skipping audio from user ${userId}`);
+            this.responseLock.release(userId, this.botId);
+            return;
+        }
+
         // Prevent processing multiple requests from the same user simultaneously
         if (this.isProcessing.has(userId)) {
             console.log(`⚠️  Already processing audio for user ${userId}, skipping...`);
+            this.responseLock.release(userId, this.botId);
             return;
         }
 
@@ -171,7 +195,7 @@ class ConversationManager {
                     const aiResponse = getRandomTick();
                     console.log(`🎲 Acknowledging with tick: "${aiResponse}"`);
                     const ttsFilePath = await this.ttsService.textToSpeech(aiResponse);
-                    await this.audioPlayer.enqueue(ttsFilePath, true);
+                    await this.audioPlayer.play(ttsFilePath, true);
                     console.log(`✅ Character switched and acknowledged\n`);
                     return;
                 }
@@ -197,10 +221,10 @@ class ConversationManager {
             // Step 3: Convert AI response to speech (TTS)
             const ttsFilePath = await this.ttsService.textToSpeech(aiResponse);
 
-            // Step 4: Play the audio response
-            await this.audioPlayer.enqueue(ttsFilePath, true);
+            // Step 4: Play the audio response immediately (no queue)
+            await this.audioPlayer.play(ttsFilePath, true);
 
-            console.log(`✅ Successfully processed and queued response for user ${userId}\n`);
+            console.log(`✅ Successfully processed and played response for user ${userId}\n`);
         } catch (error) {
             console.error(`Error processing audio for user ${userId}:`, error);
 
@@ -208,13 +232,16 @@ class ConversationManager {
             try {
                 const errorMessage = "I'm sorry, I encountered an error processing your message.";
                 const errorTTSPath = await this.ttsService.textToSpeech(errorMessage);
-                await this.audioPlayer.enqueue(errorTTSPath, true);
+                await this.audioPlayer.play(errorTTSPath, true);
             } catch (ttsError) {
                 console.error('Failed to generate error message TTS:', ttsError);
             }
         } finally {
             // Remove user from processing set
             this.isProcessing.delete(userId);
+
+            // Release the response lock
+            this.responseLock.release(userId, this.botId);
         }
     }
 

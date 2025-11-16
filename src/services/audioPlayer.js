@@ -17,7 +17,6 @@ class AudioPlayer {
         });
 
         this.isPlaying = false;
-        this.queue = [];
 
         // Subscribe the connection to the player
         this.connection.subscribe(this.player);
@@ -29,7 +28,6 @@ class AudioPlayer {
         this.player.on(AudioPlayerStatus.Idle, () => {
             console.log('🔇 Audio player is now idle');
             this.isPlaying = false;
-            this.processQueue();
         });
 
         this.player.on(AudioPlayerStatus.Playing, () => {
@@ -40,7 +38,6 @@ class AudioPlayer {
         this.player.on('error', (error) => {
             console.error('Audio player error:', error);
             this.isPlaying = false;
-            this.processQueue();
         });
     }
 
@@ -80,38 +77,10 @@ class AudioPlayer {
     }
 
     /**
-     * Add audio to queue
-     */
-    async enqueue(filePath, deleteAfterPlay = true) {
-        this.queue.push({ filePath, deleteAfterPlay });
-
-        if (!this.isPlaying) {
-            this.processQueue();
-        }
-    }
-
-    /**
-     * Process the audio queue
-     */
-    async processQueue() {
-        if (this.queue.length === 0) {
-            return;
-        }
-
-        if (this.isPlaying) {
-            return;
-        }
-
-        const { filePath, deleteAfterPlay } = this.queue.shift();
-        await this.play(filePath, deleteAfterPlay);
-    }
-
-    /**
      * Stop playing audio
      */
     stop() {
         this.player.stop();
-        this.queue = [];
         this.isPlaying = false;
         console.log('⏹️  Audio player stopped');
     }
@@ -142,7 +111,6 @@ class AudioPlayer {
     getStatus() {
         return {
             isPlaying: this.isPlaying,
-            queueLength: this.queue.length,
             playerState: this.player.state.status,
         };
     }

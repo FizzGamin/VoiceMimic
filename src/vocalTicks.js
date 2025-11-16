@@ -34,7 +34,7 @@ export function getRandomTick() {
  * Check if should use a vocal tick instead of AI response
  * @param {number} chance - Probability (0-1) of using a tick
  */
-export function shouldUseTick(chance = 0.1) {
+export function shouldUseTick(chance = 0.05) {
     return Math.random() < chance;
 }
 

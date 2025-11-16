@@ -5,6 +5,7 @@ yarn.lock
 
 # Environment variables
 .env
+.env.bot2
 
 # Audio files
 *.pcm

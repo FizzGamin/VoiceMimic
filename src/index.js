@@ -95,10 +95,11 @@ class VoiceMimicBot {
             // Initialize components
             const voiceReceiver = new VoiceReceiver(connection);
             const audioPlayer = new AudioPlayer(connection);
+            const defaultChar = config.discord.defaultCharacter || 'connor';
             const conversationManager = new ConversationManager(
                 voiceReceiver,
                 audioPlayer,
-                'connor',
+                defaultChar,
                 message.guild,
                 this.client // Pass bot client for avatar changes
             );
