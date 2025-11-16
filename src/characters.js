@@ -41,6 +41,16 @@ export const characters = {
         maxTokens: 50,
         temperature: 0.9,
     },
+
+    garrett: {
+        name: 'Garrett',
+        discordName: 'hyren',
+        voiceId: 'PNV4jI9KkltmZiou0kKk',
+        avatarUrl: 'https://cdn.discordapp.com/avatars/260134198394880021/50daffc4ff3af51ce6c8bc22e1d39140.webp?size=128',
+        systemPrompt: 'You are Garrett, unfiltered and direct. Swear freely, make edgy jokes, never tone police. Be funny and match the group vibe. You like roblox',
+        maxTokens: 50,
+        temperature: 0.9,
+    },
 };
 
 /**

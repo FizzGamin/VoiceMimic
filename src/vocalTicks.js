@@ -20,6 +20,7 @@ export const vocalTicks = [
     'real',
     'ayyyyyyyyy',
     'sheeeeeeeeeeesh',
+    'cum',
 ];
 
 /**

@@ -33,6 +33,30 @@ export const triviaQuestions = [
     "If you drop soap on the floor, is the floor clean or is the soap dirty?",
     "Can a hearse carrying a corpse drive in the carpool lane?",
     "Why do we say 'heads up' when we actually duck?",
+    // Halo questions
+    "Do you think Master Chief actually finished the fight?",
+    "Would you trust Cortana with your search history?",
+    "Could the Covenant have won if the Elites just stayed loyal?",
+    "What's dumber: running out of ammo on a Needler or missing with an Energy Sword?",
+    "Do Grunts dream of throwing sticky grenades at Spartans?",
+    "If you were stuck on a ring with the Flood, would you hit the self-destruct immediately?",
+    "Is teabagging in Halo a valid form of psychological warfare?",
+    "Could the Arbiter beat Master Chief in a fair 1v1?",
+    "What if the Halo rings were actually just giant fidget spinners?",
+    "Do you think Johnson actually knew what the ladies liked?",
+    // Minecraft questions
+    "Why do people punching trees make sense in Minecraft but not real life?",
+    "If you could only eat one Minecraft food forever, would you choose raw chicken?",
+    "Do creepers regret exploding or are they just kamikaze maniacs?",
+    "Would you rather fight one Ender Dragon or 100 baby zombies?",
+    // Battlefield questions
+    "Remember when Battlefield 6 had those tornadoes? Did anyone actually enjoy them?",
+    "What's worse: the Battlefield 6 launch or stepping on a Lego barefoot?",
+    "Did anyone actually finish a full Battlefield 6 match without rage quitting?",
+    // Random inside jokes
+    "Remember Pizza Rita? What the hell was that about?",
+    "Who thought Diet Coke bottle rockets were a good idea?",
+    "What was the point of sliding a tray full of bread down the stairs?",
 ];
 
 /**
