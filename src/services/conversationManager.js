@@ -22,6 +22,8 @@ class ConversationManager {
 
         this.isProcessing = new Set(); // Track which users are being processed
         this.isActive = false;
+        this.talkbackEnabled = false; // Talkback disabled by default (only manual !chat)
+        this.copycatMode = false; // Copycat mode disabled by default
 
         // Generate unique bot ID for this instance
         this.botId = `bot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -65,7 +67,69 @@ class ConversationManager {
                 console.error('Failed to change avatar:', error.message);
             }
         }
-    }    /**
+    }
+
+    /**
+     * Enable voice response talkback
+     */
+    enableTalkback() {
+        this.talkbackEnabled = true;
+        console.log('🔊 Talkback enabled - bot will respond to voice');
+    }
+
+    /**
+     * Disable voice response talkback
+     */
+    disableTalkback() {
+        this.talkbackEnabled = false;
+        console.log('🔇 Talkback disabled - bot will only respond to !chat');
+    }
+
+    /**
+     * Get current talkback status
+     */
+    isTalkbackEnabled() {
+        return this.talkbackEnabled;
+    }
+
+    /**
+     * Enable copycat mode
+     */
+    enableCopycat() {
+        this.copycatMode = true;
+        console.log('🔁 Copycat mode enabled - bot will repeat everything');
+    }
+
+    /**
+     * Disable copycat mode
+     */
+    disableCopycat() {
+        this.copycatMode = false;
+        console.log('🚫 Copycat mode disabled');
+    }
+
+    /**
+     * Get current copycat status
+     */
+    isCopycatEnabled() {
+        return this.copycatMode;
+    }
+
+    /**
+     * Speak text directly (for !chat command)
+     */
+    async speakText(text) {
+        try {
+            console.log(`💬 Speaking text: "${text}"`);
+            const ttsFilePath = await this.ttsService.textToSpeech(text);
+            await this.audioPlayer.play(ttsFilePath, true);
+        } catch (error) {
+            console.error('Error speaking text:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Start listening and responding to voice
      */
     async start() {
@@ -98,10 +162,10 @@ class ConversationManager {
         this.silenceTimer = setInterval(() => {
             const silenceDuration = Date.now() - this.lastActivityTime;
 
-            // If it's been 6+ seconds since last activity and we haven't asked trivia yet this silence
-            if (silenceDuration > 6000 && !this.triviaAskedInCurrentSilence) {
-                // 10% chance to ask trivia during silence
-                if (Math.random() < 0.1) {
+            // If it's been 30+ seconds since last activity and we haven't asked trivia yet this silence
+            if (silenceDuration > 30000 && !this.triviaAskedInCurrentSilence) {
+                // 2% chance to ask trivia during silence
+                if (Math.random() < 0.02) {
                     this.askRandomTrivia();
                     this.triviaAskedInCurrentSilence = true;
                 }
@@ -140,6 +204,11 @@ class ConversationManager {
      */
     async handleAudioReceived(audioData) {
         const { userId } = audioData;
+
+        // Skip if talkback is disabled and copycat is disabled
+        if (!this.talkbackEnabled && !this.copycatMode) {
+            return;
+        }
 
         // Try to acquire lock (random bot wins if both try at once)
         if (!this.responseLock.tryAcquire(userId, this.botId)) {
@@ -180,6 +249,15 @@ class ConversationManager {
             this.resetActivity();
             console.log('✅ Valid conversation detected - silence timer reset');
 
+            // If copycat mode is enabled, just repeat what they said
+            if (this.copycatMode) {
+                console.log(`🔁 Copycat mode: repeating "${transcribedText}"`);
+                const ttsFilePath = await this.ttsService.textToSpeech(transcribedText);
+                await this.audioPlayer.play(ttsFilePath, true);
+                console.log(`✅ Copycat response played\n`);
+                return;
+            }
+
             // Check if user is addressing a specific character with "Hey [name]"
             const characterSwitch = this.detectCharacterSwitch(transcribedText);
             if (characterSwitch) {
@@ -204,7 +282,7 @@ class ConversationManager {
             // Step 2: Decide if we should use a vocal tick or full AI response
             let aiResponse;
 
-            if (shouldUseTick(0.3)) { // 30% chance of using a vocal tick
+            if (shouldUseTick(0.05)) { // 5% chance of using a vocal tick
                 aiResponse = getRandomTick();
                 console.log(`🎲 Using vocal tick: "${aiResponse}"`);
             } else {

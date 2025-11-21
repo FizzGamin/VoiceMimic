@@ -48,6 +48,15 @@ class VoiceMimicBot {
                     case 'char':
                         await this.handleCharacterCommand(message, args);
                         break;
+                    case 'chat':
+                        await this.handleChatCommand(message, args);
+                        break;
+                    case 'talkback':
+                        await this.handleTalkbackCommand(message, args);
+                        break;
+                    case 'copycat':
+                        await this.handleCopycatCommand(message, args);
+                        break;
                     case 'help':
                         await this.handleHelpCommand(message);
                         break;
@@ -160,6 +169,84 @@ class VoiceMimicBot {
         }
     }
 
+    async handleChatCommand(message, args) {
+        const manager = this.conversationManagers.get(message.guild.id);
+
+        if (!manager) {
+            await message.reply('❌ I need to be in a voice channel first! Use `!join`');
+            return;
+        }
+
+        if (args.length === 0) {
+            await message.reply('❌ Please provide text to speak. Usage: `!chat <text>`');
+            return;
+        }
+
+        const textToSpeak = args.join(' ');
+
+        try {
+            await manager.speakText(textToSpeak);
+            await message.react('✅');
+        } catch (error) {
+            console.error('Error in chat command:', error);
+            await message.reply('❌ Failed to speak the text.');
+        }
+    }
+
+    async handleTalkbackCommand(message, args) {
+        const manager = this.conversationManagers.get(message.guild.id);
+
+        if (!manager) {
+            await message.reply('❌ I need to be in a voice channel first! Use `!join`');
+            return;
+        }
+
+        if (args.length === 0) {
+            const status = manager.isTalkbackEnabled() ? 'enabled' : 'disabled';
+            await message.reply(`🔊 Talkback is currently **${status}**. Use \`!talkback enable\` or \`!talkback disable\`.`);
+            return;
+        }
+
+        const action = args[0].toLowerCase();
+
+        if (action === 'enable' || action === 'on') {
+            manager.enableTalkback();
+            await message.reply('✅ Talkback enabled - bot will respond to voice');
+        } else if (action === 'disable' || action === 'off') {
+            manager.disableTalkback();
+            await message.reply('✅ Talkback disabled - bot will only respond to !chat');
+        } else {
+            await message.reply('❌ Invalid option. Use `!talkback enable` or `!talkback disable`');
+        }
+    }
+
+    async handleCopycatCommand(message, args) {
+        const manager = this.conversationManagers.get(message.guild.id);
+
+        if (!manager) {
+            await message.reply('❌ I need to be in a voice channel first! Use `!join`');
+            return;
+        }
+
+        if (args.length === 0) {
+            const status = manager.isCopycatEnabled() ? 'enabled' : 'disabled';
+            await message.reply(`🔁 Copycat mode is currently **${status}**. Use \`!copycat enable\` or \`!copycat disable\`.`);
+            return;
+        }
+
+        const action = args[0].toLowerCase();
+
+        if (action === 'enable' || action === 'on') {
+            manager.enableCopycat();
+            await message.reply('✅ Copycat mode enabled - bot will repeat everything it hears');
+        } else if (action === 'disable' || action === 'off') {
+            manager.disableCopycat();
+            await message.reply('✅ Copycat mode disabled');
+        } else {
+            await message.reply('❌ Invalid option. Use `!copycat enable` or `!copycat disable`');
+        }
+    }
+
     async handleHelpCommand(message) {
         const helpText = `
 **VoiceMimic Bot Commands**
@@ -168,16 +255,22 @@ class VoiceMimicBot {
 \`${config.discord.prefix}leave\` - Leave the voice channel
 \`${config.discord.prefix}character <name>\` - Switch bot personality (connor, elijah, or griffin)
 \`${config.discord.prefix}character list\` - List all available characters
+\`${config.discord.prefix}chat <text>\` - Make the bot speak your text
+\`${config.discord.prefix}talkback <enable|disable>\` - Enable/disable voice responses (disabled by default)
+\`${config.discord.prefix}copycat <enable|disable>\` - Enable/disable copycat mode (repeats everything)
 \`${config.discord.prefix}help\` - Show this help message
+
+**Modes:**
+- **Default**: Only responds to \`!chat\` commands
+- **Talkback**: Bot generates AI responses to voice
+- **Copycat**: Bot repeats exactly what it hears
 
 **How it works:**
 1. Join a voice channel
 2. Use \`!join\` to bring the bot into your channel
-3. Start speaking! The bot will:
-   - Listen to your voice
-   - Transcribe what you say
-   - Generate an AI response
-   - Speak back to you with ElevenLabs voice
+3. Use \`!chat <text>\` to make the bot speak anything you want
+4. Use \`!copycat enable\` to make bot repeat what you say
+5. Use \`!talkback enable\` for AI-generated responses
 
 **Note:** The bot needs proper permissions to join voice channels and speak.
     `;
